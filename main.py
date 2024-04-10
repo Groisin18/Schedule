@@ -72,7 +72,9 @@ def test_week (day: int, month: int, year: int) -> list:
                 Errors_list.append(str_date)
             else:
                 print(f"Дата {str_date} отработана корректно")
-        except (TimeoutError, ConnectionError, requests.exceptions.ConnectTimeout):
+        except (
+            TimeoutError, ConnectionError, requests.exceptions.ConnectTimeout
+            ):
             print(f"Ошибка соединения с сайтом при обработке даты {str_date}")
         date_for_test += delta
     return Errors_list if Errors_list else "Ошибок не найдено"
