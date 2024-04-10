@@ -63,16 +63,19 @@ def test_week (day: int, month: int, year: int) -> list:
     delta = timedelta(days=1)
     Errors_list = []
 
-    for _ in range(7):
+    for _ in range(365):
         try:
-            date_for_test += delta
-            print(find_saint_and_service(date_for_test))
-        except AttributeError:
-            error_date = date_for_test.strftime('%d.%m.%Y')
-            Errors_list.append(error_date)
-            print(f"Ошибка при обработке даты {error_date}")
-
+            saint_and_service = find_saint_and_service(date_for_test)
+            str_date = date_for_test.strftime('%d.%m.%Y')
+            if saint_and_service[1] is None:
+                print(f"Ошибка при обработке указаний даты {str_date}")
+                Errors_list.append(str_date)
+            else:
+                print(f"Дата {str_date} отработана корректно")
+        except (TimeoutError, ConnectionError, requests.exceptions.ConnectTimeout):
+            print(f"Ошибка соединения с сайтом при обработке даты {str_date}")
+        date_for_test += delta
     return Errors_list if Errors_list else "Ошибок не найдено"
 
-print(test_week(12, 5, 2024))
+print(test_week(1, 1, 2024))
 # print(find_saint_and_service(datetime(2024, 4, 10)))
