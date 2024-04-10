@@ -51,9 +51,14 @@ def find_saint_and_service(date_: datetime) -> tuple:
 
 # Надо сделать обработку случая, когда слово "служба" встречается в примечании
 # div class='ln-emb-note'
+
+# Надо сделать обработку случая, когда слово "служба" стоит в другом падеже
+# (как правило, "службы")
+
+# Надо сделать обработку случая "Совершается всенощное бдение"
     return (in_day_head, service_options)
 
-def test_week (day: int, month: int, year: int) -> list:
+def test_period (day: int, month: int, year: int, count_days: int) -> list:
     '''
         Функция тестирует функцию find_saint_and_service()\n
         на семи днях, начиная с передаваемой в функцию даты
@@ -63,7 +68,7 @@ def test_week (day: int, month: int, year: int) -> list:
     delta = timedelta(days=1)
     Errors_list = []
 
-    for _ in range(365):
+    for _ in range(count_days):
         try:
             saint_and_service = find_saint_and_service(date_for_test)
             str_date = date_for_test.strftime('%d.%m.%Y')
@@ -79,5 +84,4 @@ def test_week (day: int, month: int, year: int) -> list:
         date_for_test += delta
     return Errors_list if Errors_list else "Ошибок не найдено"
 
-print(test_week(1, 1, 2024))
-# print(find_saint_and_service(datetime(2024, 4, 10)))
+print(test_period(1, 6, 2024, 30))
