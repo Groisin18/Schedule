@@ -28,7 +28,7 @@ def parse_page(date_: datetime) -> None:
 def find_saint_and_service(date_: datetime) -> tuple:
     '''
     Функция принимает дату в формате datetime и возвращает кортеж:\n
-    (празднуемые святые, какая служба будет служиться),\n
+    (дата, празднуемые святые, какая служба будет служиться),\n
     используя информацию с сайта patriarchia.ru
     '''
     soup = parse_page(date_) # парсим страницу Богослужебных указаний 
@@ -56,8 +56,8 @@ def find_saint_and_service(date_: datetime) -> tuple:
 
 # Надо сделать обработку случая, когда слово "служба" встречается в примечании
 # div class='ln-emb-note'
-        
-    return (in_day_head, service_options)
+    str_date = date_.strftime('%d.%m.%Y')
+    return (str_date, in_day_head, service_options)
 
 def test_period (day: int, month: int, year: int, count_days: int) -> list:
     '''
@@ -82,6 +82,14 @@ def test_period (day: int, month: int, year: int, count_days: int) -> list:
             TimeoutError, ConnectionError, requests.exceptions.ConnectTimeout
             ):
             print(f"Ошибка соединения с сайтом при обработке даты {str_date}")
+            Errors_list.append(str_date)
+            print("Пробуем снова...")
+            saint_and_service = find_saint_and_service(date_for_test)
+            if saint_and_service[1] is None:
+                print(f"Повторная ошибка при обработке даты {str_date}")
+            else:
+                Errors_list.remove(str_date)
+                print(f"Дата {str_date} отработана корректно")
         date_for_test += delta
     return Errors_list if Errors_list else "Ошибок не найдено"
 
