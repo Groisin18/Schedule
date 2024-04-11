@@ -2,6 +2,7 @@ import requests
 import re
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
+import json
 
 def parse_page(date_: datetime) -> None:
     '''
@@ -59,6 +60,7 @@ def find_saint_and_service(date_: datetime) -> tuple:
     str_date = date_.strftime('%d.%m.%Y')
     return (str_date, in_day_head, service_options)
 
+
 def test_period (day: int, month: int, year: int, count_days: int) -> list:
     '''
         Функция тестирует функцию find_saint_and_service()\n
@@ -92,6 +94,19 @@ def test_period (day: int, month: int, year: int, count_days: int) -> list:
                 print(f"Дата {str_date} отработана корректно")
         date_for_test += delta
     return Errors_list if Errors_list else "Ошибок не найдено"
+
+
+def add_data_into_json(date_: datetime):
+    '''
+    Функция принимает дату в формате datetime,\n
+    формирует json-файл "data.json", если такого еще нет,\n
+    либо открывает уже существующий; и добавляет в него данные:\n
+    "дата": [празднуемые святые, какая служба будет служиться],\n
+    взятые из функции find_saint_and_service(date_)
+    '''
+    data = find_saint_and_service(date_)
+    with open("data.json", "a", encoding="utf-8") as file:
+        json.dump({data[0]: [data[1], data[2]]}, file)
 
 
 with open("test_year_1.html", "w", encoding="utf-8") as file:
