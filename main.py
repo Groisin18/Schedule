@@ -48,14 +48,15 @@ def find_saint_and_service(date_: datetime) -> tuple:
 
     service_options = soup.find(text=re.compile("Служба", re.I))
                                                    # Ищем богослужебные указания
+    if service_options is None:
+        service_options = soup.find(text=re.compile("Службы", re.I))
+    
+    if service_options is None:
+        service_options = soup.find(text=re.compile("Бдение", re.I))
 
 # Надо сделать обработку случая, когда слово "служба" встречается в примечании
 # div class='ln-emb-note'
-
-# Надо сделать обработку случая, когда слово "служба" стоит в другом падеже
-# (как правило, "службы")
-
-# Надо сделать обработку случая "Совершается всенощное бдение"
+        
     return (in_day_head, service_options)
 
 def test_period (day: int, month: int, year: int, count_days: int) -> list:
@@ -84,4 +85,6 @@ def test_period (day: int, month: int, year: int, count_days: int) -> list:
         date_for_test += delta
     return Errors_list if Errors_list else "Ошибок не найдено"
 
-print(test_period(1, 6, 2024, 30))
+
+with open("test_year_1.html", "w", encoding="utf-8") as file:
+    file.writelines(test_period(1, 1, 2024, 365))
