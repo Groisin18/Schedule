@@ -1,8 +1,11 @@
 import requests
 import re
+import json
+import csv
+import os
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
-import json
+
 
 def parse_page(date_: datetime) -> None:
     '''
@@ -33,7 +36,7 @@ def find_saint_and_service(date_: datetime) -> tuple:
     используя информацию с сайта patriarchia.ru
     '''
     soup = parse_page(date_) # парсим страницу Богослужебных указаний 
-                                               #на данный день в файл index.html
+                                            # на данный день в файл index.html
 
     with open("index.html", encoding="utf-8") as file: # Создание объекта soup
         src = file.read()
@@ -47,13 +50,13 @@ def find_saint_and_service(date_: datetime) -> tuple:
 
                               # Надо сделать отдельную обработку для воскресений
 
-    service_options = soup.find(text=re.compile("Служба", re.I))
+    service_options = soup.find(string=re.compile("Служба", re.I))
                                                    # Ищем богослужебные указания
     if service_options is None:
-        service_options = soup.find(text=re.compile("Службы", re.I))
+        service_options = soup.find(string=re.compile("Службы", re.I))
     
     if service_options is None:
-        service_options = soup.find(text=re.compile("Бдение", re.I))
+        service_options = soup.find(string=re.compile("Бдение", re.I))
 
 # Надо сделать обработку случая, когда слово "служба" встречается в примечании
 # div class='ln-emb-note'
@@ -63,8 +66,9 @@ def find_saint_and_service(date_: datetime) -> tuple:
 
 def test_period (day: int, month: int, year: int, count_days: int) -> list:
     '''
-        Функция тестирует функцию find_saint_and_service()\n
-        на семи днях, начиная с передаваемой в функцию даты
+        Функция принимает день, месяц, год и количество дней,\n
+        и тестирует функцию find_saint_and_service()\n
+        на count_days днях, начиная с передаваемой в функцию даты
     '''
 
     date_for_test = datetime(year, month, day)
@@ -96,18 +100,36 @@ def test_period (day: int, month: int, year: int, count_days: int) -> list:
     return Errors_list if Errors_list else "Ошибок не найдено"
 
 
-def add_data_into_json(date_: datetime):
+def add_data_into_json(date_: datetime, file_name: str):
     '''
-    Функция принимает дату в формате datetime,\n
-    формирует json-файл "data.json", если такого еще нет,\n
+    Функция принимает дату в формате datetime и имя файла\n
+    формирует json-файл "file_name.json", если такого еще нет,\n
     либо открывает уже существующий; и добавляет в него данные:\n
     "дата": [празднуемые святые, какая служба будет служиться],\n
     взятые из функции find_saint_and_service(date_)
     '''
     data = find_saint_and_service(date_)
-    with open("data.json", "a", encoding="utf-8") as file:
+    with open(file_name, "a", encoding="utf-8") as file:
         json.dump({data[0]: [data[1], data[2]]}, file)
 
+def add_data_into_csv(date_: datetime, file_name: str):
+    '''
+    Функция принимает дату в формате datetime и имя файла\n
+    формирует csv-файл "file_name.csv", если такого еще нет,\n
+    либо открывает уже существующий; и добавляет в него данные:\n
+    (дата; празднуемые святые; какая служба будет служиться),\n
+    взятые из функции find_saint_and_service(date_)
+    '''
+    data = find_saint_and_service(date_)
+    with open(file_name, "a", encoding="utf-8") as file:
+        columns = ("username", "email", "dtime")
+        writer = csv.writer(file, delimiter=';')
+        if os.stat(file_name).st_size == 0:
+            writer.writerow(columns)
+        writer.writerow((data[0], data[1], data[2]))
 
-with open("test_year_1.html", "w", encoding="utf-8") as file:
-    file.writelines(test_period(1, 1, 2024, 365))
+
+add_data_into_csv(datetime(2024, 3, 1), "test_file_1.csv")
+
+# with open("test_year_1.html", "w", encoding="utf-8") as file:
+#     file.writelines(test_period(1, 1, 2024, 365))
