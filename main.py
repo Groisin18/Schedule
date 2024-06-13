@@ -52,7 +52,10 @@ class Days:
             in_day_head.find(". ", in_day_head.find(". ")+1)+2:
             ]                          # Отсекаем в строчке число и день недели
 
-                        # Надо сделать отдельную обработку для воскресений
+        if self.date_.weekday() == 6: # Обработка воскресений
+            saints = saints[saints.find('. ')+2:]
+            service_options = 'Совершается всенощное бдение'
+            return (saints, service_options)
 
         service_options = soup.find(string=re.compile("Служба", re.I))
                                                 # Ищем богослужебные указания
@@ -61,7 +64,6 @@ class Days:
 
         if service_options is None:
             service_options = soup.find(string=re.compile("Бдение", re.I))
-            flag = True # Заготовка под бдение
 
     # Надо сделать обработку случая, когда слово "служба" встречается в примечании
     # div class='ln-emb-note'
@@ -96,7 +98,7 @@ class Days:
 
 def make_file_for_period (count_days: int) -> list:
     '''
-    НЕ РАБОТАЕТ
+    НЕ РАБОТАЕТ (но хранит полезный код)
         Функция принимает день, месяц, год и количество дней,\n
         и тестирует функцию find_saint_and_service()\n
         на count_days днях, начиная с передаваемой в функцию даты
