@@ -5,11 +5,13 @@ import csv
 import os
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
+from typing import Literal
 
 class Days:
     def __init__(self, date_: datetime):
         self.date_ = date_
         self.saints, self.service_options = self.find_saints_and_service()
+        self.sign = self.discover_sign()
 
     def save_page_in_file(self) -> None:
         '''
@@ -54,7 +56,7 @@ class Days:
 
         if self.date_.weekday() == 6: # Обработка воскресений
             saints = saints[saints.find('. ')+2:]
-            service_options = 'Совершается всенощное бдение'
+            service_options = 'Совершается всенощное бдение (воскресение)'
             return (saints, service_options)
 
         service_options = soup.find(string=re.compile("Служба", re.I))
@@ -69,6 +71,14 @@ class Days:
     # div class='ln-emb-note'
         return (saints, service_options)
 
+    signs = Literal[
+                'Не определен', 'Вседневная', 'Шестеричная', 'Славословная',
+                 'Полиелей', 'Бдение', 'Двунадесятый'
+                 ]
+    def discover_sign(self) -> signs:
+        return 'Не определен'
+
+
     def add_data_into_json(self, file_name: str):
         '''
         Функция принимает дату в формате datetime и имя файла\n
@@ -80,6 +90,7 @@ class Days:
         str_date = datetime.strftime(self.date_, "%d.%m.%Y")
         with open(file_name, "a", encoding="utf-8") as file:
             json.dump({str_date: [self.saints, self.service_options]}, file)
+
 
     def add_data_into_csv(self, file_name: str):
         '''
@@ -95,6 +106,8 @@ class Days:
             if os.stat(file_name).st_size == 0:
                 writer.writerow(columns)
             writer.writerow((str_date, self.saints, self.service_options))
+
+
 
 def make_file_for_period (count_days: int) -> list:
     '''
