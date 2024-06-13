@@ -61,13 +61,40 @@ class Days:
 
         if service_options is None:
             service_options = soup.find(string=re.compile("Бдение", re.I))
+            flag = True # Заготовка под бдение
 
     # Надо сделать обработку случая, когда слово "служба" встречается в примечании
     # div class='ln-emb-note'
         return (saints, service_options)
 
+    def add_data_into_json(self, file_name: str):
+        '''
+        Функция принимает дату в формате datetime и имя файла\n
+        формирует json-файл "file_name.json", если такого еще нет,\n
+        либо открывает уже существующий; и добавляет в него данные:\n
+        "дата": [празднуемые святые, какая служба будет служиться]
+        '''
 
-def test_period (day: int, month: int, year: int, count_days: int) -> list:
+        str_date = datetime.strftime(self.date_, "%d.%m.%Y")
+        with open(file_name, "a", encoding="utf-8") as file:
+            json.dump({str_date: [self.saints, self.service_options]}, file)
+
+    def add_data_into_csv(self, file_name: str):
+        '''
+        Функция принимает дату в формате datetime и имя файла\n
+        формирует csv-файл "file_name.csv", если такого еще нет,\n
+        либо открывает уже существующий; и добавляет в него данные:\n
+        (дата; празднуемые святые; какая служба будет служиться)
+        '''
+        str_date = datetime.strftime(self.date_, "%d.%m.%Y")
+        with open(file_name, "a", encoding="utf-8") as file:
+            columns = ("date", "saints", "service_options")
+            writer = csv.writer(file, delimiter=';')
+            if os.stat(file_name).st_size == 0:
+                writer.writerow(columns)
+            writer.writerow((str_date, self.saints, self.service_options))
+
+def make_file_for_period (count_days: int) -> list:
     '''
     НЕ РАБОТАЕТ
         Функция принимает день, месяц, год и количество дней,\n
@@ -104,37 +131,8 @@ def test_period (day: int, month: int, year: int, count_days: int) -> list:
     # return Errors_list if Errors_list else "Ошибок не найдено"
 
 
-def add_data_into_json(date_: datetime, file_name: str):
-    '''
-    Функция принимает дату в формате datetime и имя файла\n
-    формирует json-файл "file_name.json", если такого еще нет,\n
-    либо открывает уже существующий; и добавляет в него данные:\n
-    "дата": [празднуемые святые, какая служба будет служиться]
-    '''
-    day_ = Days(date_)
-    str_date = datetime.strftime(day_.date_, "%d.%m.%Y")
-    with open(file_name, "a", encoding="utf-8") as file:
-        json.dump({str_date: [day_.saints, day_.service_options]}, file)
-
-def add_data_into_csv(date_: datetime, file_name: str):
-    '''
-    Функция принимает дату в формате datetime и имя файла\n
-    формирует csv-файл "file_name.csv", если такого еще нет,\n
-    либо открывает уже существующий; и добавляет в него данные:\n
-    (дата; празднуемые святые; какая служба будет служиться)
-    '''
-    day_ = Days(date_)
-    str_date = datetime.strftime(day_.date_, "%d.%m.%Y")
-    with open(file_name, "a", encoding="utf-8") as file:
-        columns = ("date", "saints", "service_options")
-        writer = csv.writer(file, delimiter=';')
-        if os.stat(file_name).st_size == 0:
-            writer.writerow(columns)
-        writer.writerow((str_date, day_.saints, day_.service_options))
-
-
-delta = timedelta(1)
 st_date = datetime(2024, 5, 27)
 for i in range(10):
-    add_data_into_csv(st_date, "test1.csv")
-    st_date += delta
+    delta = timedelta(i)
+    day = Days(st_date + delta)
+    day.add_data_into_csv("test_file_1.csv")
