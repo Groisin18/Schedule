@@ -75,8 +75,18 @@ class Days:
                 'Не определен', 'Вседневная', 'Шестеричная', 'Славословная',
                  'Полиелей', 'Бдение', 'Двунадесятый'
                  ]
-    def discover_sign(self) -> signs:
-        return 'Не определен'
+    def discover_sign(self) -> list[signs]:
+        '''
+        Функция возвращает список с вариантами знака службы
+        '''
+        result = []
+        if 'не имеет праздничного знака' in self.service_options:
+            result.append("Вседневная")
+        if 'полиелей' in self.service_options:
+            result.append("Полиелей")
+        if not result:
+            result.append('Не определен')
+        return
 
 
     def add_data_into_json(self, file_name: str):
@@ -146,8 +156,8 @@ def make_file_for_period (count_days: int) -> list:
     # return Errors_list if Errors_list else "Ошибок не найдено"
 
 
-st_date = datetime(2024, 5, 27)
-for i in range(10):
+st_date = datetime(2024, 1, 1)
+for i in range(100):
     delta = timedelta(i)
     day = Days(st_date + delta)
     day.add_data_into_csv("test_file_1.csv")
