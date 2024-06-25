@@ -58,8 +58,11 @@ class Days:
             saints = saints[saints.find('. ')+2:]
             service_options = 'Совершается всенощное бдение (воскресение)'
             return (saints, service_options)
-
-        service_options = soup.find(string=re.compile("Служба", re.I))
+# надо сделать обработку для разных вариантов
+        service_options = soup.find(string=re.compile('совершается всенощное',
+                                                      re.I))
+        if service_options is None:
+            service_options = soup.find(string=re.compile("Служба", re.I))
                                                 # Ищем богослужебные указания
         if service_options is None:
             service_options = soup.find(string=re.compile("Службы", re.I))
@@ -82,11 +85,17 @@ class Days:
         result = []
         if 'не имеет праздничного знака' in self.service_options:
             result.append("Вседневная")
+        if 'шестеричн' in self.service_options:
+            result.append("Шестеричная")
+        if 'лавословн' in self.service_options:
+            result.append("Славословная")
         if 'полиелей' in self.service_options:
             result.append("Полиелей")
+        if 'Бден' in self.service_options or 'бден' in self.service_options:
+            result.append("Бдение")
         if not result:
             result.append('Не определен')
-        return
+        return result
 
 
     def add_data_into_json(self, file_name: str):
@@ -94,12 +103,13 @@ class Days:
         Функция принимает дату в формате datetime и имя файла\n
         формирует json-файл "file_name.json", если такого еще нет,\n
         либо открывает уже существующий; и добавляет в него данные:\n
-        "дата": [празднуемые святые, какая служба будет служиться]
+        "дата": [празднуемые святые, какая служба будет служиться, знак службы]
         '''
 
         str_date = datetime.strftime(self.date_, "%d.%m.%Y")
         with open(file_name, "a", encoding="utf-8") as file:
-            json.dump({str_date: [self.saints, self.service_options]}, file)
+            json.dump({str_date: [self.saints, self.service_options,
+                                  self.sign]}, file)
 
 
     def add_data_into_csv(self, file_name: str):
@@ -107,7 +117,7 @@ class Days:
         Функция принимает дату в формате datetime и имя файла\n
         формирует csv-файл "file_name.csv", если такого еще нет,\n
         либо открывает уже существующий; и добавляет в него данные:\n
-        (дата; празднуемые святые; какая служба будет служиться)
+        (дата; празднуемые святые; какая служба будет служиться, знак службы)
         '''
         str_date = datetime.strftime(self.date_, "%d.%m.%Y")
         with open(file_name, "a", encoding="utf-8") as file:
@@ -115,7 +125,8 @@ class Days:
             writer = csv.writer(file, delimiter=';')
             if os.stat(file_name).st_size == 0:
                 writer.writerow(columns)
-            writer.writerow((str_date, self.saints, self.service_options))
+            writer.writerow((str_date, self.saints, self.service_options,
+                             self.sign))
 
 
 
@@ -157,7 +168,7 @@ def make_file_for_period (count_days: int) -> list:
 
 
 st_date = datetime(2024, 1, 1)
-for i in range(100):
+for i in range(15):
     delta = timedelta(i)
     day = Days(st_date + delta)
     day.add_data_into_csv("test_file_1.csv")
