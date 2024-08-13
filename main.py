@@ -1,8 +1,4 @@
-import requests
-import re
-import json
-import csv
-import os
+import requests, re, json, csv, os
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from typing import Literal
@@ -11,7 +7,7 @@ class Days:
     def __init__(self, date_: datetime):
         self.date_ = date_
         self.saints, self.service_options = self.find_saints_and_service()
-        self.sign = self.discover_sign()
+        self.signs = self.discover_sign()
 
     def save_page_in_file(self) -> None:
         '''
@@ -34,6 +30,38 @@ class Days:
 
         return None
 
+    def prepare_index_for_work(self):
+        '''
+        Функция сохраняет страницу и готовит ее для последующей обработки
+        '''
+        self.save_page_in_file() # сохраняем страницу Богослужебных
+                                 # указаний на данный день в файл index.html
+
+        with open("index.html", encoding="utf-8") as file:
+            src = file.read()
+        soup = BeautifulSoup(src, "lxml")
+
+        # обрезка index.html только до нужного div'a
+        soup = soup.find('div', id = "main")
+        soup = soup.find('div', class_ = "section")
+
+        # устраняем ошибку с неверным определением богослужебных указаний
+        str_for_delete = soup.find(string=re.compile('может быть перенесена', re.I))
+        if str_for_delete:
+            str_for_delete.extract()
+
+# str_for_delete = soup.find(string=re.compile('переносится', re.I))
+# if str_for_delete:
+#     str_for_delete.extract()
+
+        # отсекаем все примечания, которые могут мешаться
+        for i in range(5):
+            str_for_delete = soup.find(id="ln-note-ref-" + str(i))
+            if str_for_delete:
+                str_for_delete.parent.extract()
+
+        with open('index.html', 'w', encoding="utf-8") as f:
+            f.write(soup.prettify())
 
     def find_saints_and_service(self) -> tuple:
         '''
@@ -41,60 +69,81 @@ class Days:
         (празднуемые святые, какая служба будет служиться),\n
         используя информацию из файла index.html
         '''
-        soup = self.save_page_in_file() # сохраняем страницу Богослужебных
-                                    # указаний на данный день в файл index.html
+        self.prepare_index_for_work()
 
         with open("index.html", encoding="utf-8") as file:
-            src = file.read()                           # Создание объекта soup
+            src = file.read()
         soup = BeautifulSoup(src, "lxml")
 
-        in_day_head = soup.find(class_ = "ln-day-head").text  # Находим
-                 # заголовок с перечислением святых, празднующихся в этот день
+        # Находим заголовок с перечислением святых, празднующихся в этот день
+        in_day_head = soup.find(class_ = "ln-day-head").text
+        # Отсекаем в строчке число и день недели
         saints = in_day_head[
             in_day_head.find(". ", in_day_head.find(". ")+1)+2:
-            ]                          # Отсекаем в строчке число и день недели
+            ].strip()
 
-        if self.date_.weekday() == 6: # Обработка воскресений
+        service_options = []
+        # Обработка воскресений
+        if self.date_.weekday() == 6:
             saints = saints[saints.find('. ')+2:]
-            service_options = 'Совершается всенощное бдение (воскресение)'
+            service_options.append('Совершается всенощное бдение (воскресение)')
             return (saints, service_options)
-# надо сделать обработку для разных вариантов
-        service_options = soup.find(string=re.compile('совершается всенощное',
+
+        def find_variant_in_all_index():
+            '''Функция ищет богослужебные указания в файле index.html
+            и добавляет их в self.service_options
+            '''
+            with open("index.html", encoding="utf-8") as file:
+                src = file.read()
+                soup = BeautifulSoup(src, "lxml")
+            service_option = soup.find(string=re.compile('совершается всенощное',
                                                       re.I))
-        if service_options is None:
-            service_options = soup.find(string=re.compile("Служба", re.I))
-                                                # Ищем богослужебные указания
-        if service_options is None:
-            service_options = soup.find(string=re.compile("Службы", re.I))
+            if  service_option is None:
+                service_option = soup.find(string=re.compile("Служба", re.I))
+                if service_option is None:
+                    service_option = soup.find(string=re.compile("Службы", re.I))
+                    if service_option is None:
+                        service_option = soup.find(string=re.compile("Бдение", re.I))
+            service_options.append(service_option.strip())
 
-        if service_options is None:
-            service_options = soup.find(string=re.compile("Бдение", re.I))
+    # Проверяем, есть ли разные варианты службы в указаниях, добавляем их в
+    # список вариантов
+        possible_variants = ['A', 'B', 'C', 'D']
+        for i in possible_variants:
+            variant = soup.find(id = ("ln-nav-ref-" + i))
+            if variant:
+                service_options.append(variant.parent.previous_sibling.strip())
+            else:
+                if not service_options:
+                    find_variant_in_all_index()
+                break
 
-    # Надо сделать обработку случая, когда слово "служба" встречается в примечании
-    # div class='ln-emb-note'
         return (saints, service_options)
 
-    signs = Literal[
-                'Не определен', 'Вседневная', 'Шестеричная', 'Славословная',
+    possible_signs = Literal[
+                'Не определен', 'Аллилуия' 'Вседневная', 'Шестеричная', 'Славословная',
                  'Полиелей', 'Бдение', 'Двунадесятый'
                  ]
-    def discover_sign(self) -> list[signs]:
+    def discover_sign(self) -> list[possible_signs]:
         '''
         Функция возвращает список с вариантами знака службы
         '''
         result = []
-        if 'не имеет праздничного знака' in self.service_options:
-            result.append("Вседневная")
-        if 'шестеричн' in self.service_options:
-            result.append("Шестеричная")
-        if 'лавословн' in self.service_options:
-            result.append("Славословная")
-        if 'полиелей' in self.service_options:
-            result.append("Полиелей")
-        if 'Бден' in self.service_options or 'бден' in self.service_options:
-            result.append("Бдение")
-        if not result:
-            result.append('Не определен')
+        for i in self.service_options:
+            if 'аллилуйная' in i:
+                result.append("Аллилуия")
+            if 'не имеет праздничного знака' in i:
+                result.append("Вседневная")
+            if 'шестеричн' in i:
+                result.append("Шестеричная")
+            if 'лавословн' in i:
+                result.append("Славословная")
+            if 'полиелей' in i or 'Полиелей' in i:
+                result.append("Полиелей")
+            if 'Бден' in i or 'бден' in i:
+                result.append("Бдение")
+            if not result:
+                result.append('Не определен')
         return result
 
 
@@ -109,7 +158,7 @@ class Days:
         str_date = datetime.strftime(self.date_, "%d.%m.%Y")
         with open(file_name, "a", encoding="utf-8") as file:
             json.dump({str_date: [self.saints, self.service_options,
-                                  self.sign]}, file)
+                                  self.signs]}, file)
 
 
     def add_data_into_csv(self, file_name: str):
@@ -126,7 +175,7 @@ class Days:
             if os.stat(file_name).st_size == 0:
                 writer.writerow(columns)
             writer.writerow((str_date, self.saints, self.service_options,
-                             self.sign))
+                             self.signs))
 
 
 
@@ -168,7 +217,21 @@ def make_file_for_period (count_days: int) -> list:
 
 
 st_date = datetime(2024, 1, 1)
-for i in range(15):
+for i in range(100):
     delta = timedelta(i)
     day = Days(st_date + delta)
-    day.add_data_into_csv("test_file_1.csv")
+    if day.signs[0] == 'Не определен':
+        print(st_date + delta)
+        day.add_data_into_csv("test_file_1.csv")
+
+    '''
+    На примере 23 января 2024 надо посмотреть, что делать с вариантом
+    "Приводим также порядок совершения полиелейной или бденной службы"
+
+    Надо посмотреть, нужны ли строчки 50-52 (закомментированное обрезание)
+
+    # Надо сделать обработку случая, когда слово "служба" встречается в примечании
+    # div class='ln-emb-note'
+
+    Огромная работа для великого поста
+    '''
