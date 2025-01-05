@@ -3,19 +3,20 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from typing import Literal
 
-class Days:
-    def __init__(self, date_: datetime):
-        self.date_ = date_
-        self.saints, self.service_options = self.find_saints_and_service()
-        self.signs = self.discover_sign()
+FILENAME_SAVED_PAGE = 'saved_page.html'
+FILENAME_PREPARED_PAGE = 'prepared_page.html'
 
-    def save_page_in_file(self) -> None:
+class Parser:
+    def __init__(self):
+        pass
+
+    def save_page(self, date: datetime) -> None:
         '''
         Функция принимает дату в формате datetime и сохраняет страницу \n
         с сайта patriarchia.ru с Богослужеными указаниями\n
-        в файл index.html
+        в файл [filename].html
         '''
-        url = f"http://www.patriarchia.ru/bu/{self.date_.strftime('%Y-%m-%d')}/"
+        url = f"http://www.patriarchia.ru/bu/{date.strftime('%Y-%m-%d')}/"
         user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537\
             .36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
         headers = {
@@ -23,25 +24,27 @@ class Days:
             "User-Agent": user_agent
         }
 
-        req = requests.get(url, headers=headers)
-        src = req.text
-        with open("index.html", "w", encoding="utf-8") as file:
-            file.write(src)                        # Считывание страницы в файл
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        page = response.text
+
+        filename = FILENAME_SAVED_PAGE
+        with open(filename, "w", encoding="utf-8") as file:
+            file.write(page)
 
         return None
+    
 
-    def prepare_index_for_work(self):
+    def prepare_page_for_work(self):
         '''
-        Функция сохраняет страницу и готовит ее для последующей обработки
+        Функция обрезает страницу FILENAMED_SAVED_PAGE до необходимого div'а
         '''
-        self.save_page_in_file() # сохраняем страницу Богослужебных
-                                 # указаний на данный день в файл index.html
+        filename = FILENAME_SAVED_PAGE
+        with open(filename, encoding="utf-8") as file:
+            page = file.read()
 
-        with open("index.html", encoding="utf-8") as file:
-            src = file.read()
-        soup = BeautifulSoup(src, "lxml")
+        soup = BeautifulSoup(page, "lxml")
 
-        # обрезка index.html только до нужного div'a
         soup = soup.find('div', id = "main")
         soup = soup.find('div', class_ = "section")
 
@@ -53,15 +56,30 @@ class Days:
 # str_for_delete = soup.find(string=re.compile('переносится', re.I))
 # if str_for_delete:
 #     str_for_delete.extract()
+# отсекаем все примечания, которые могут мешаться
 
-        # отсекаем все примечания, которые могут мешаться
         for i in range(5):
             str_for_delete = soup.find(id="ln-note-ref-" + str(i))
             if str_for_delete:
                 str_for_delete.parent.extract()
+        
+        return soup.prettify()
+    
+    def parse(self, date: datetime):
+        self.save_page(date)
+        div = self.prepare_page_for_work()
 
-        with open('index.html', 'w', encoding="utf-8") as f:
-            f.write(soup.prettify())
+        filename = FILENAME_PREPARED_PAGE
+        with open(filename, 'w', encoding="utf-8") as f:
+            f.write(div)
+
+        return None
+
+class Day:
+    def __init__(self, date: datetime):
+        self.date = date
+        self.saints, self.service_options = self.find_saints_and_service()
+        self.signs = self.discover_sign()
 
     def find_saints_and_service(self) -> tuple:
         '''
@@ -69,9 +87,12 @@ class Days:
         (празднуемые святые, какая служба будет служиться),\n
         используя информацию из файла index.html
         '''
-        self.prepare_index_for_work()
+        parser = Parser()
+        parser.parse(self.date)
 
-        with open("index.html", encoding="utf-8") as file:
+        filename = FILENAME_PREPARED_PAGE
+
+        with open(filename, encoding="utf-8") as file:
             src = file.read()
         soup = BeautifulSoup(src, "lxml")
 
@@ -84,16 +105,17 @@ class Days:
 
         service_options = []
         # Обработка воскресений
-        if self.date_.weekday() == 6:
+        if self.date.weekday() == 6:
             saints = saints[saints.find('. ')+2:]
             service_options.append('Совершается всенощное бдение (воскресение)')
             return (saints, service_options)
 
         def find_variant_in_all_index():
-            '''Функция ищет богослужебные указания в файле index.html
+            '''Функция ищет богослужебные указания в файле FILENAME_PREPARED_PAGE
             и добавляет их в self.service_options
             '''
-            with open("index.html", encoding="utf-8") as file:
+            filename = FILENAME_PREPARED_PAGE
+            with open(filename, encoding="utf-8") as file:
                 src = file.read()
                 soup = BeautifulSoup(src, "lxml")
             service_option = soup.find(string=re.compile('совершается всенощное',
@@ -146,36 +168,40 @@ class Days:
                 result.append('Не определен')
         return result
 
+class DatabaseInserter:
 
-    def add_data_into_json(self, file_name: str):
+    def __init__(self):
+        pass
+
+    def add_data_into_json(self, day: Day, file_name: str):
         '''
-        Функция принимает дату в формате datetime и имя файла\n
+        Функция принимает объект класса Day и имя файла,\n
         формирует json-файл "file_name.json", если такого еще нет,\n
         либо открывает уже существующий; и добавляет в него данные:\n
         "дата": [празднуемые святые, какая служба будет служиться, знак службы]
         '''
 
-        str_date = datetime.strftime(self.date_, "%d.%m.%Y")
+        str_date = datetime.strftime(day.date, "%d.%m.%Y")
         with open(file_name, "a", encoding="utf-8") as file:
-            json.dump({str_date: [self.saints, self.service_options,
-                                  self.signs]}, file)
+            json.dump({str_date: [day.saints, day.service_options,
+                                  day.signs]}, file)
 
 
-    def add_data_into_csv(self, file_name: str):
+    def add_data_into_csv(self, day: Day, file_name: str):
         '''
-        Функция принимает дату в формате datetime и имя файла\n
+        Функция принимает объект класса Day и имя файла,\n
         формирует csv-файл "file_name.csv", если такого еще нет,\n
         либо открывает уже существующий; и добавляет в него данные:\n
         (дата; празднуемые святые; какая служба будет служиться, знак службы)
         '''
-        str_date = datetime.strftime(self.date_, "%d.%m.%Y")
+        str_date = datetime.strftime(day.date, "%d.%m.%Y")
         with open(file_name, "a", encoding="utf-8") as file:
             columns = ("date", "saints", "service_options")
             writer = csv.writer(file, delimiter=';')
             if os.stat(file_name).st_size == 0:
                 writer.writerow(columns)
-            writer.writerow((str_date, self.saints, self.service_options,
-                             self.signs))
+            writer.writerow((str_date, day.saints, day.service_options,
+                             day.signs))
 
 
 
@@ -217,12 +243,13 @@ def make_file_for_period (count_days: int) -> list:
 
 
 st_date = datetime(2024, 1, 1)
-for i in range(100):
+for i in range(10):
     delta = timedelta(i)
-    day = Days(st_date + delta)
-    if day.signs[0] == 'Не определен':
-        print(st_date + delta)
-        day.add_data_into_csv("test_file_1.csv")
+    day = Day(st_date + delta)
+    print(st_date + delta)
+    file_name = "test_file_1.csv"
+    inserter = DatabaseInserter()
+    inserter.add_data_into_csv(day, file_name)
 
     '''
     На примере 23 января 2024 надо посмотреть, что делать с вариантом
